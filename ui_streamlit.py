@@ -4,193 +4,143 @@ from students import *
 from faculty import *
 from courses import *
 from enrollments import *
+from database import create_connection
 
-st.set_page_config(page_title="College Management System", layout="wide")
-st.title("🎓 College Management System")
+# ---- PAGE CONFIG ----
+st.set_page_config(
+    page_title="🎓 College Management System",
+    page_icon="📘",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
 
-menu = st.sidebar.selectbox("Choose Module", ["Students", "Faculty", "Courses", "Enrollments", "Dashboard"])
+# ---- STYLING ----
+st.markdown("""
+    <style>
+        .main-title {
+            font-size: 42px;
+            font-weight: 700;
+            color: #3f51b5;
+            text-align: center;
+            padding-bottom: 10px;
+        }
+        .sub-header {
+            font-size: 26px;
+            color: #009688;
+            padding-top: 20px;
+        }
+        .stButton>button {
+            background-color: #009688;
+            color: white;
+            font-weight: bold;
+            border-radius: 8px;
+            padding: 0.5em 1em;
+        }
+    </style>
+""", unsafe_allow_html=True)
 
-# ---------- STUDENTS ----------
+# ---- MAIN TITLE ----
+st.markdown('<div class="main-title">College Management System Dashboard</div>', unsafe_allow_html=True)
+
+# ---- SIDEBAR ----
+st.sidebar.image("https://cdn-icons-png.flaticon.com/512/201/201818.png", width=100)
+st.sidebar.title("Navigation")
+menu = st.sidebar.radio("Go to:", ["Students", "Faculty", "Courses", "Enrollments", "Dashboard"])
+
+# ---- STUDENTS MODULE ----
 if menu == "Students":
-    st.header("👩‍🎓 Student Management")
-    option = st.radio("Operation", ["Add", "View", "Update Email", "Delete"])
+    st.markdown("<div class='sub-header'>👨‍🎓 Student Management</div>", unsafe_allow_html=True)
+    tab1, tab2 = st.tabs(["➕ Add Student", "📋 View/Search Students"])
 
-    if option == "Add":
-        sid = st.number_input("Student ID", min_value=1)
-        name = st.text_input("Name")
-        dept = st.text_input("Department")
-        year = st.number_input("Year", min_value=1, max_value=4)
-        email = st.text_input("Email")
+    with tab1:
+        col1, col2 = st.columns(2)
+        with col1:
+            sid = st.number_input("Student ID", min_value=1)
+            name = st.text_input("Full Name")
+            dept = st.selectbox("Department", ["CSE", "ECE", "EEE", "MECH", "CIVIL"])
+        with col2:
+            year = st.selectbox("Year", [1, 2, 3, 4])
+            email = st.text_input("Email")
         if st.button("Add Student"):
             add_student(sid, name, dept, year, email)
+            st.success("✅ Student added successfully")
 
-    elif option == "View":
-        conn = create_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM students")
-        data = cursor.fetchall()
-        conn.close()
-
-        df = pd.DataFrame(data, columns=["Student ID", "Name", "Department", "Year", "Email"])
-        dept_filter = st.text_input("Filter by Department")
-        year_filter = st.selectbox("Filter by Year", ["All", 1, 2, 3, 4])
-        name_search = st.text_input("Search by Name")
-
-        if dept_filter:
-            df = df[df["Department"].str.contains(dept_filter, case=False)]
-        if year_filter != "All":
-            df = df[df["Year"] == year_filter]
-        if name_search:
-            df = df[df["Name"].str.contains(name_search, case=False)]
-
+    with tab2:
+        df = pd.DataFrame(view_students(), columns=["ID", "Name", "Dept", "Year", "Email"])
+        search_term = st.text_input("Search by Name")
+        if search_term:
+            df = df[df["Name"].str.contains(search_term, case=False)]
         st.dataframe(df, use_container_width=True)
-        csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download as CSV", csv, "students.csv", "text/csv")
+        st.download_button("⬇️ Export as CSV", data=df.to_csv(index=False), file_name="students.csv")
 
-    elif option == "Update Email":
-        sid = st.number_input("Student ID", min_value=1)
-        new_email = st.text_input("New Email")
-        if st.button("Update"):
-            update_student_email(sid, new_email)
-
-    elif option == "Delete":
-        sid = st.number_input("Student ID", min_value=1)
-        if st.button("Delete"):
-            delete_student(sid)
-
-# ---------- FACULTY ----------
+# ---- FACULTY MODULE ----
 elif menu == "Faculty":
-    st.header("👨‍🏫 Faculty Management")
-    option = st.radio("Operation", ["Add", "View", "Update Email", "Delete"])
-
-    if option == "Add":
+    st.markdown("<div class='sub-header'>👩‍🏫 Faculty Management</div>", unsafe_allow_html=True)
+    tab1, tab2 = st.tabs(["➕ Add Faculty", "📋 View Faculty"])
+    with tab1:
         fid = st.text_input("Faculty ID")
-        name = st.text_input("Name")
-        dept = st.text_input("Department")
+        name = st.text_input("Full Name")
+        dept = st.selectbox("Department", ["CSE", "ECE", "EEE", "MECH", "CIVIL"])
         email = st.text_input("Email")
         if st.button("Add Faculty"):
             add_faculty(fid, name, dept, email)
-
-    elif option == "View":
-        conn = create_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM faculty")
-        data = cursor.fetchall()
-        conn.close()
-
-        df = pd.DataFrame(data, columns=["Faculty ID", "Name", "Department", "Email"])
+            st.success("✅ Faculty added successfully")
+    with tab2:
+        df = pd.DataFrame(view_faculty(), columns=["ID", "Name", "Dept", "Email"])
         st.dataframe(df, use_container_width=True)
-        csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download as CSV", csv, "faculty.csv", "text/csv")
+        st.download_button("⬇️ Export as CSV", data=df.to_csv(index=False), file_name="faculty.csv")
 
-    elif option == "Update Email":
-        fid = st.text_input("Faculty ID")
-        new_email = st.text_input("New Email")
-        if st.button("Update"):
-            update_faculty_email(fid, new_email)
-
-    elif option == "Delete":
-        fid = st.text_input("Faculty ID")
-        if st.button("Delete"):
-            delete_faculty(fid)
-
-# ---------- COURSES ----------
+# ---- COURSES MODULE ----
 elif menu == "Courses":
-    st.header("📚 Course Management")
-    option = st.radio("Operation", ["Add", "View", "Update Name", "Delete"])
-
-    if option == "Add":
+    st.markdown("<div class='sub-header'>📚 Course Management</div>", unsafe_allow_html=True)
+    tab1, tab2 = st.tabs(["➕ Add Course", "📋 View Courses"])
+    with tab1:
         cid = st.text_input("Course ID")
-        name = st.text_input("Course Name")
+        cname = st.text_input("Course Name")
         fid = st.text_input("Faculty ID")
         if st.button("Add Course"):
-            add_course(cid, name, fid)
-
-    elif option == "View":
-        conn = create_connection()
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM courses")
-        data = cursor.fetchall()
-        conn.close()
-
-        df = pd.DataFrame(data, columns=["Course ID", "Course Name", "Faculty ID"])
+            add_course(cid, cname, fid)
+            st.success("✅ Course added successfully")
+    with tab2:
+        df = pd.DataFrame(view_courses(), columns=["ID", "Name", "Faculty ID"])
         st.dataframe(df, use_container_width=True)
-        csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download as CSV", csv, "courses.csv", "text/csv")
+        st.download_button("⬇️ Export as CSV", data=df.to_csv(index=False), file_name="courses.csv")
 
-    elif option == "Update Name":
-        cid = st.text_input("Course ID")
-        new_name = st.text_input("New Course Name")
-        if st.button("Update"):
-            update_course_name(cid, new_name)
-
-    elif option == "Delete":
-        cid = st.text_input("Course ID")
-        if st.button("Delete"):
-            delete_course(cid)
-
-# ---------- ENROLLMENTS ----------
+# ---- ENROLLMENTS MODULE ----
 elif menu == "Enrollments":
-    st.header("📝 Enrollment Management")
-    option = st.radio("Operation", ["Add", "View", "Update Grade", "Delete"])
-
-    if option == "Add":
-        sid = st.number_input("Student ID", min_value=1)
-        cid = st.text_input("Course ID")
-        grade = st.text_input("Grade")
-        if st.button("Add Enrollment"):
-            add_enrollment(sid, cid, grade)
-
-    elif option == "View":
-        conn = create_connection()
-        cursor = conn.cursor()
-        cursor.execute('''SELECT enrollment_id, students.name, courses.course_name, grade
-                          FROM enrollments
-                          JOIN students ON students.student_id = enrollments.student_id
-                          JOIN courses ON courses.course_id = enrollments.course_id''')
-        data = cursor.fetchall()
-        conn.close()
-
-        df = pd.DataFrame(data, columns=["Enrollment ID", "Student Name", "Course Name", "Grade"])
-        grade_filter = st.text_input("Filter by Grade")
-        course_search = st.text_input("Search by Course")
-
-        if grade_filter:
-            df = df[df["Grade"].str.contains(grade_filter, case=False)]
-        if course_search:
-            df = df[df["Course Name"].str.contains(course_search, case=False)]
-
+    st.markdown("<div class='sub-header'>📝 Enrollment Management</div>", unsafe_allow_html=True)
+    tab1, tab2 = st.tabs(["➕ Enroll Student", "📋 View Enrollments"])
+    with tab1:
+        student_id = st.number_input("Student ID", min_value=1)
+        course_id = st.text_input("Course ID")
+        grade = st.selectbox("Grade", ["A", "B", "C", "D", "F"])
+        if st.button("Enroll"):
+            add_enrollment(student_id, course_id, grade)
+            st.success("✅ Enrollment successful")
+    with tab2:
+        df = pd.DataFrame(view_enrollments(), columns=["Enroll ID", "Student ID", "Course ID", "Grade"])
         st.dataframe(df, use_container_width=True)
-        csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button("📥 Download as CSV", csv, "enrollments.csv", "text/csv")
+        st.download_button("⬇️ Export as CSV", data=df.to_csv(index=False), file_name="enrollments.csv")
 
-    elif option == "Update Grade":
-        eid = st.number_input("Enrollment ID", min_value=1)
-        grade = st.text_input("New Grade")
-        if st.button("Update"):
-            update_grade(eid, grade)
-
-    elif option == "Delete":
-        eid = st.number_input("Enrollment ID", min_value=1)
-        if st.button("Delete"):
-            delete_enrollment(eid)
-
-# ---------- DASHBOARD ----------
+# ---- DASHBOARD MODULE ----
 elif menu == "Dashboard":
-    st.header("📊 College Analytics Dashboard")
-
-    # Students per department
+    st.markdown("<div class='sub-header'>📈 Analytics Dashboard</div>", unsafe_allow_html=True)
     conn = create_connection()
-    df_students = pd.read_sql_query("SELECT department, COUNT(*) as count FROM students GROUP BY department", conn)
-    df_years = pd.read_sql_query("SELECT year, COUNT(*) as count FROM students GROUP BY year", conn)
-    df_faculty = pd.read_sql_query("SELECT department, COUNT(*) as count FROM faculty GROUP BY department", conn)
+    df_students = pd.read_sql("SELECT department, COUNT(*) as count FROM students GROUP BY department", conn)
+    df_years = pd.read_sql("SELECT year, COUNT(*) as count FROM students GROUP BY year", conn)
+    df_faculty = pd.read_sql("SELECT department, COUNT(*) as count FROM faculty GROUP BY department", conn)
     conn.close()
 
-    st.subheader("Students per Department")
-    st.bar_chart(df_students.set_index("department"))
+    col1, col2, col3 = st.columns(3)
+    col1.metric("🎓 Total Students", df_students["count"].sum())
+    col2.metric("📘 Total Courses", len(view_courses()))
+    col3.metric("👩‍🏫 Total Faculty", df_faculty["count"].sum())
 
-    st.subheader("Students per Year")
-    st.bar_chart(df_years.set_index("year"))
-
-    st.subheader("Faculty Count per Department")
-    st.bar_chart(df_faculty.set_index("department"))
+    st.markdown("---")
+    col4, col5 = st.columns(2)
+    with col4:
+        st.subheader("📊 Students per Department")
+        st.bar_chart(df_students.set_index("department"))
+    with col5:
+        st.subheader("📊 Students per Year")
+        st.bar_chart(df_years.set_index("year"))
