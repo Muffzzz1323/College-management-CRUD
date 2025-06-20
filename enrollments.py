@@ -1,54 +1,56 @@
-from database import create_connection
+import streamlit as st
+import sqlite3
+import pandas as pd
 
-def create_enrollments_table():
+# --- DB CONNECTION ---
+def create_connection():
+    return sqlite3.connect("college.db", check_same_thread=False)
+
+# --- MAIN UI ---
+def manage_enrollments():
+    st.subheader("Enrollment Management")
     conn = create_connection()
     cursor = conn.cursor()
-    cursor.execute('''CREATE TABLE IF NOT EXISTS enrollments (
-                        enrollment_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                        student_id INTEGER,
-                        course_id TEXT,
-                        grade TEXT,
-                        FOREIGN KEY (student_id) REFERENCES students(student_id),
-                        FOREIGN KEY (course_id) REFERENCES courses(course_id))''')
-    conn.commit()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS enrollments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            student_id TEXT,
+            course_id TEXT
+        )
+    """)
+
+    st.markdown("### Enroll Student in Course")
+    students = pd.read_sql("SELECT student_id FROM students", conn)["student_id"].tolist()
+    courses = pd.read_sql("SELECT course_id FROM courses", conn)["course_id"].tolist()
+
+    with st.form("enroll_form"):
+        sid = st.selectbox("Select Student ID", students)
+        cid = st.selectbox("Select Course ID", courses)
+        submit = st.form_submit_button("Enroll")
+
+        if submit:
+            cursor.execute("SELECT * FROM enrollments WHERE student_id=? AND course_id=?", (sid, cid))
+            if cursor.fetchone():
+                st.warning("This enrollment already exists.")
+            else:
+                cursor.execute("INSERT INTO enrollments (student_id, course_id) VALUES (?, ?)", (sid, cid))
+                conn.commit()
+                st.success("Enrollment added successfully.")
+
+    st.markdown("---")
+    st.markdown("### View Enrollments")
+    df = pd.read_sql("SELECT * FROM enrollments", conn)
+    st.dataframe(df, use_container_width=True)
+
+    if st.session_state.role == "admin":
+        st.markdown("### Delete Enrollment")
+        enrollment_id = st.number_input("Enter Enrollment ID to delete", min_value=1)
+        if st.button("Delete"):
+            cursor.execute("DELETE FROM enrollments WHERE id=?", (enrollment_id,))
+            conn.commit()
+            st.success("Deleted if existed.")
+    else:
+        st.info("Only admin can delete enrollments.")
+
     conn.close()
 
-def add_enrollment(student_id, course_id, grade):
-    create_enrollments_table()
-    conn = create_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute("INSERT INTO enrollments (student_id, course_id, grade) VALUES (?, ?, ?)",
-                       (student_id, course_id, grade))
-        conn.commit()
-        print("✅ Enrollment added.")
-    except Exception as e:
-        print("❌ Error:", e)
-    conn.close()
-
-def view_enrollments():
-    conn = create_connection()
-    cursor = conn.cursor()
-    cursor.execute('''SELECT enrollment_id, students.name, courses.course_name, grade
-                      FROM enrollments
-                      JOIN students ON students.student_id = enrollments.student_id
-                      JOIN courses ON courses.course_id = enrollments.course_id''')
-    for row in cursor.fetchall():
-        print(row)
-    conn.close()
-
-def update_grade(enrollment_id, new_grade):
-    conn = create_connection()
-    cursor = conn.cursor()
-    cursor.execute("UPDATE enrollments SET grade = ? WHERE enrollment_id = ?", (new_grade, enrollment_id))
-    conn.commit()
-    print("✏️ Grade updated.")
-    conn.close()
-
-def delete_enrollment(enrollment_id):
-    conn = create_connection()
-    cursor = conn.cursor()
-    cursor.execute("DELETE FROM enrollments WHERE enrollment_id = ?", (enrollment_id,))
-    conn.commit()
-    print("🗑️ Enrollment deleted.")
-    conn.close()
